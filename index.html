@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>浮水印排版工具</title>
+<style>
+  :root {
+    --ink: #3d4450; --mist: #7f8893; --frost: #b2bac3;
+    --paper: #f7f8f9; --card: #ffffff; --line: #e3e6ea; --accent: #5b6b7f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+    background: var(--paper); color: var(--ink);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 32px 16px 60px;
+  }
+  header { text-align: center; margin-bottom: 22px; }
+  h1 { font-family: "Kaiti TC","BiauKai","Kaiti SC",serif; font-size: 26px; font-weight: 400; letter-spacing: 5px; }
+  .sub { margin-top: 8px; font-size: 13px; color: var(--mist); letter-spacing: 1px; }
+
+  /* ===== 左右兩大區 ===== */
+  main {
+    width: 100%; max-width: 1080px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px;
+    align-items: stretch;
+  }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  #rightCol > .card:first-child { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+
+  /* 左:上傳格與預覽 */
+  .slot {
+    border: 1.5px dashed var(--frost); border-radius: 12px; background: var(--card);
+    padding: 18px 14px; text-align: center; cursor: pointer; transition: .15s;
+  }
+  .slot.over { border-color: var(--accent); background: #eef1f4; }
+  .slot.filled { border-style: solid; border-color: var(--line); cursor: default; }
+  .slot h2 { font-size: 14px; font-weight: 600; letter-spacing: 2px; margin-bottom: 4px; }
+  .slot .desc { font-size: 12px; color: var(--mist); line-height: 1.6; }
+  .slot .info { display: none; margin-top: 6px; font-size: 12px; color: var(--mist); }
+  .slot .info b { color: var(--ink); font-weight: 500; }
+  .slot .info span { display: block; margin-top: 3px; word-break: break-all; line-height: 1.5; }
+  .slot .swap { display: none; margin-top: 6px; font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; text-decoration: underline; font-family: inherit; }
+  .slot.filled .info, .slot.filled .swap { display: block; }
+  .slot.filled .desc { display: none; }
+
+  #previewCard { display: none; }
+  #previewWrap { border-radius: 8px; overflow: hidden; background: #edeff1; display: flex; justify-content: center; align-items: center; }
+  #previewCv { max-width: 100%; max-height: 74vh; display: block; }
+
+  /* 右:種類切換與控制 */
+  #typeSeg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  #typeSeg button {
+    flex: 1; padding: 11px 4px; font-size: 14px; letter-spacing: 2px; font-family: inherit;
+    background: var(--card); color: var(--mist); border: none; cursor: pointer;
+  }
+  #typeSeg button.on { background: var(--accent); color: #fff; }
+  .typePanel { display: none; }
+  .typePanel.on { display: block; }
+  #ctrlScroll { flex: 1 1 auto; min-height: 300px; max-height: none; overflow-y: auto; padding-right: 4px; }
+
+  .ctrl { margin-bottom: 14px; }
+  .ctrl > label { display: block; font-size: 13px; font-weight: 600; letter-spacing: 1px; margin-bottom: 6px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    flex: 1; padding: 7px 4px; font-size: 13px; font-family: inherit;
+    background: var(--card); color: var(--mist); border: none; cursor: pointer;
+  }
+  .seg button.on { background: var(--accent); color: #fff; }
+
+  .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .slider-row .tag { font-size: 12px; color: var(--mist); min-width: 38px; }
+  .slider-row input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 0; }
+  .slider-row .val { font-size: 12px; color: var(--mist); min-width: 42px; text-align: right; }
+
+  .num-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .num-row input[type="number"] {
+    width: 52px; padding: 5px 6px; font-size: 13px; font-family: inherit;
+    border: 1px solid var(--line); border-radius: 6px; text-align: center;
+  }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer; }
+  .chk input { accent-color: var(--accent); width: 15px; height: 15px; }
+
+  #posGrid {
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    gap: 3px; padding: 3px; width: 160px; height: 106px;
+    background-size: cover; background-position: center;
+    border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  }
+  #posGrid button, .miniPos button {
+    border: 1px dashed rgba(127,136,147,.6); border-radius: 4px;
+    background: rgba(255,255,255,.22); cursor: pointer; min-width: 0; min-height: 0;
+  }
+  #posGrid button:hover, .miniPos button:hover { background: rgba(255,255,255,.5); }
+  #posGrid button.on, .miniPos button.on { background: rgba(91,107,127,.78); border: 1px solid var(--accent); }
+  .miniPos {
+    display: grid; grid-template-columns: repeat(3, 26px); grid-template-rows: repeat(3, 18px);
+    gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; width: max-content;
+    background: #eef0f2;
+  }
+
+  .palette { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 2px; }
+  .palette .sw { width: 26px; height: 26px; border-radius: 6px; cursor: pointer; border: 1px solid var(--line); padding: 0; }
+  .palette .sw.on { border: 2px solid var(--accent); box-shadow: inset 0 0 0 1.5px #fff; }
+  .palette .orig {
+    width: auto; padding: 0 10px; height: 26px; font-size: 12px; font-family: inherit;
+    background: var(--card); color: var(--mist); border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+  }
+  .palette .orig.on { border: 2px solid var(--accent); color: var(--ink); padding: 0 9px; }
+  .palette input[type="color"] {
+    width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 6px;
+    padding: 0; cursor: pointer; background: var(--card); appearance: none; -webkit-appearance: none;
+  }
+  .palette input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
+  .palette input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
+  .palette input[type="color"].on { border: 2px solid var(--accent); }
+
+  #stampNote { font-size: 12px; color: var(--mist); line-height: 1.6; margin-top: -4px; margin-bottom: 12px; }
+  #stampNote.bad { color: #8a6d3b; }
+  #debgNote { font-size: 12px; color: #8a6d3b; line-height: 1.6; margin-top: 6px; display: none; }
+  #stampCtrls { display: none; margin-top: 14px; }
+
+  .tlayer { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; background: #fbfcfc; }
+  .tlayer .thead { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .tlayer .thead input[type="text"] {
+    flex: 1; min-width: 0; padding: 7px 10px; font-size: 14px; font-family: inherit;
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .tlayer .del {
+    width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--card); color: var(--mist); cursor: pointer; font-size: 14px; line-height: 1;
+  }
+  .tlayer .del:hover { color: #8a5049; border-color: #e8cfcb; }
+  .tlayer select {
+    width: 100%; font-size: 13px; padding: 6px 8px; margin-bottom: 8px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink);
+  }
+  #addText {
+    width: 100%; padding: 9px; font-size: 13px; letter-spacing: 2px; font-family: inherit;
+    color: var(--accent); background: none; border: 1.5px dashed var(--frost); border-radius: 10px; cursor: pointer;
+  }
+  #addText:hover { border-color: var(--accent); }
+  #addText:disabled { color: var(--frost); cursor: default; }
+  #fontApiBtn {
+    margin-top: 8px; font-size: 12px; color: var(--accent); background: none; border: none;
+    cursor: pointer; text-decoration: underline; font-family: inherit; display: none;
+  }
+
+  button.primary {
+    width: 100%; padding: 12px; font-size: 15px; letter-spacing: 3px; font-family: inherit;
+    color: #fff; background: var(--accent); border: none; border-radius: 10px; cursor: pointer;
+  }
+  button.primary:hover { background: #4a5a6e; }
+  button.primary:disabled { background: var(--frost); cursor: default; }
+  .outmeta { margin-top: 10px; font-size: 12px; color: var(--mist); text-align: center; }
+  input[type="file"] { display: none; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>浮水印排版</h1>
+  <p class="sub">輸出與原圖同尺寸 · 全程本機處理</p>
+</header>
+
+<main>
+  <!-- ===== 左半:圖片 ===== -->
+  <div class="col">
+    <div class="slot" id="slotB" tabindex="0" role="button" aria-label="選擇圖片">
+      <h2>圖片</h2>
+      <p class="desc">要加浮水印的照片(JPEG / PNG / WebP)，點擊或拖放</p>
+      <p class="info"><b id="infoB"></b> <span id="nameB"></span></p>
+      <button class="swap" data-for="fileB">換一張</button>
+    </div>
+    <div class="card" id="previewCard"><div id="previewWrap"><canvas id="previewCv"></canvas></div></div>
+  </div>
+  <input type="file" id="fileB" accept="image/jpeg,image/png,image/webp">
+  <input type="file" id="fileA" accept=".svg,image/svg+xml,image/png">
+
+  <!-- ===== 右半:浮水印 ===== -->
+  <div class="col" id="rightCol">
+    <div class="card">
+      <div id="typeSeg">
+        <button data-t="stamp" class="on">圖案浮水印</button>
+        <button data-t="text">文字浮水印</button>
+      </div>
+
+      <div id="ctrlScroll">
+        <!-- 圖案面板 -->
+        <div class="typePanel on" id="stampPanel">
+          <div class="slot" id="slotA" tabindex="0" role="button" aria-label="選擇浮水印圖案">
+            <h2>浮水印檔案</h2>
+            <p class="desc">單一圖案(SVG 或 透明PNG)</p>
+            <p class="info"><b id="infoA"></b> <span id="nameA"></span></p>
+            <button class="swap" data-for="fileA">換一個</button>
+          </div>
+          <div id="stampCtrls">
+            <div class="ctrl">
+              <label>排列方式</label>
+              <div class="seg" id="modeSeg">
+                <button data-m="single" class="on">單一</button>
+                <button data-m="grid">網格</button>
+              </div>
+            </div>
+            <div class="ctrl">
+              <label>大小(佔圖寬)</label>
+              <div class="slider-row">
+                <input type="range" id="size" min="4" max="60" value="18">
+                <span class="val" id="sizeVal">18%</span>
+              </div>
+            </div>
+            <p id="stampNote"></p>
+            <div class="ctrl" id="singleCtrl">
+              <label>位置</label>
+              <div id="posGrid"></div>
+              <div style="margin-top:10px">
+                <div class="slider-row">
+                  <span class="tag">位移 X</span>
+                  <input type="range" id="offX" min="-30" max="30" value="0">
+                  <span class="val" id="offXVal">0%</span>
+                </div>
+                <div class="slider-row">
+                  <span class="tag">位移 Y</span>
+                  <input type="range" id="offY" min="-30" max="30" value="0">
+                  <span class="val" id="offYVal">0%</span>
+                </div>
+                <p style="font-size:12px;color:var(--mist);margin-top:2px;line-height:1.6">0 = 貼齊選定位置<br>X 正右負左、Y 正下負上,換位置時自動歸零。</p>
+              </div>
+            </div>
+            <div class="ctrl" id="gridCtrl" style="display:none">
+              <label>網格</label>
+              <div class="num-row">
+                橫 <input type="number" id="cols" min="1" max="12" value="4">
+                × 縱 <input type="number" id="rows" min="1" max="12" value="4">
+              </div>
+              <label class="chk"><input type="checkbox" id="stagger" checked> 交錯排列(邊緣補滿)</label>
+            </div>
+            <div class="ctrl">
+              <label>顏色</label>
+              <div class="palette" id="palette"></div>
+              <label class="chk"><input type="checkbox" id="debg"> 白底轉透明(修正假透明圖案)</label>
+              <p id="debgNote">偵測到這個圖案的背景不是真透明,已自動開啟修正。</p>
+            </div>
+            <div class="ctrl">
+              <label>濃度</label>
+              <div class="slider-row">
+                <input type="range" id="opacity" min="10" max="100" value="80">
+                <span class="val" id="opVal">80%</span>
+              </div>
+            </div>
+            <div class="ctrl">
+              <label>旋轉</label>
+              <div class="slider-row">
+                <input type="range" id="rotate" min="-45" max="45" value="0">
+                <span class="val" id="rotVal">0°</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 文字面板 -->
+        <div class="typePanel" id="textPanel">
+          <div id="tlayers"></div>
+          <button id="addText" type="button">+ 新增文字浮水印(最多 5 個)</button>
+          <button id="fontApiBtn" type="button">獲取裝置全部字型(點擊以授權)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <button class="primary" id="export" disabled>輸出圖片</button>
+      <p class="outmeta" id="outMeta">上傳圖片後即可輸出</p>
+    </div>
+  </div>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const state = {
+    A: null, B: null,
+    mode: 'single', pos: 8,
+    tint: null,
+    stampCache: { key: '', canvas: null },
+    texts: [],
+    fonts: [],
+  };
+  const MAX_TEXTS = 5;
+  const fmtDim = (w,h) => w+' × '+h+' px';
+  const BG_L = 236, INK_L = 168;
+  const PRESETS = [
+    ['#ffffff','白'], ['#f2ede4','暖白'], ['#b2bac3','霜藍'],
+    ['#7f8893','霧灰'], ['#5b6b7f','墨青'], ['#3d4450','玄黑'],
+  ];
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n>>16)&255, (n>>8)&255, n&255];
+  }
+
+  // ===== 種類切換(僅切換編輯面板,兩種浮水印同時生效、互不干涉) =====
+  document.querySelectorAll('#typeSeg button').forEach(b =>
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#typeSeg button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      $('stampPanel').classList.toggle('on', b.dataset.t === 'stamp');
+      $('textPanel').classList.toggle('on', b.dataset.t === 'text');
+    }));
+
+  // ===== 字型偵測 =====
+  const FONT_CANDIDATES = [
+    'PingFang TC','Heiti TC','Songti TC','Kaiti TC','BiauKai','HanziPen TC','HanziPen SC',
+    'Yuanti TC','Wawati TC','Xingkai TC','LingWai TC','GenSenRounded TW',
+    'Microsoft JhengHei','DFKai-SB','MingLiU','PMingLiU','Noto Sans TC','Noto Serif TC',
+    'Helvetica Neue','Georgia','Times New Roman','Futura','Avenir Next','Didot',
+    'Courier New','Arial','Trebuchet MS','Palatino','Snell Roundhand','Marker Felt',
+  ];
+  function fontAvailable(name) {
+    const c = document.createElement('canvas').getContext('2d');
+    const t = '測試字型樣本wmWM01ilj';
+    return ['monospace','serif','sans-serif'].some(fb => {
+      c.font = '40px ' + fb;
+      const a = c.measureText(t).width;
+      c.font = '40px "' + name + '", ' + fb;
+      return c.measureText(t).width !== a;
+    });
+  }
+  function detectFonts() {
+    state.fonts = FONT_CANDIDATES.filter(fontAvailable);
+    if (!state.fonts.length) state.fonts = ['sans-serif'];
+  }
+  detectFonts();
+  if ('queryLocalFonts' in window) $('fontApiBtn').style.display = 'inline';
+  $('fontApiBtn').addEventListener('click', async () => {
+    try {
+      const list = await window.queryLocalFonts();
+      const fams = [...new Set(list.map(f => f.family))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+      if (fams.length) {
+        state.fonts = fams;
+        document.querySelectorAll('.tlayer select').forEach(sel => fillFontSelect(sel, sel.value));
+        $('fontApiBtn').textContent = '已載入 ' + fams.length + ' 個裝置字型';
+      }
+    } catch(e) { alert('未取得字型授權,維持使用內建偵測清單。'); }
+  });
+  function fillFontSelect(sel, keep) {
+    sel.innerHTML = '';
+    for (const f of state.fonts) {
+      const o = document.createElement('option');
+      o.value = f; o.textContent = f;
+      o.style.fontFamily = '"' + f + '"';
+      sel.appendChild(o);
+    }
+    if (keep && state.fonts.includes(keep)) sel.value = keep;
+  }
+
+  // ===== 檔案載入 =====
+  async function decodeFile(file) {
+    const url = URL.createObjectURL(file);
+    const img = new Image(); img.src = url;
+    await img.decode();
+    return { img, url };
+  }
+  async function loadB(f) {
+    if (!f) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { alert('圖片請使用 JPEG、PNG 或 WebP。'); return; }
+    try {
+      const { img, url } = await decodeFile(f);
+      state.B = { img, w: img.naturalWidth, h: img.naturalHeight, name: f.name, type: f.type };
+      $('infoB').textContent = fmtDim(state.B.w, state.B.h);
+      $('nameB').textContent = f.name;
+      $('slotB').classList.add('filled');
+      $('previewCard').style.display = 'block';
+      const pg = $('posGrid');
+      pg.style.backgroundImage = 'url("' + url + '")';
+      pg.style.height = Math.max(70, Math.min(214, Math.round(160 * state.B.h / state.B.w))) + 'px';
+    } catch(e) { alert('無法讀取這張圖片。'); return; }
+    refresh();
+  }
+  async function loadA(f) {
+    if (!f) return;
+    const isSvg = /\.svg$/i.test(f.name) || f.type === 'image/svg+xml';
+    if (!isSvg && f.type !== 'image/png') { alert('圖案請使用 SVG 或 透明PNG。'); return; }
+    try {
+      const { img } = await decodeFile(f);
+      if (!img.naturalWidth) { alert('讀不到圖案尺寸(SVG 需有 width/height)。'); return; }
+      state.A = { img, w: img.naturalWidth, h: img.naturalHeight, name: f.name, isSvg };
+      state.stampCache.key = '';
+      $('infoA').textContent = fmtDim(state.A.w, state.A.h) + (isSvg ? '(向量)' : '');
+      $('nameA').textContent = f.name;
+      $('slotA').classList.add('filled');
+      $('stampCtrls').style.display = 'block';
+      detectFakeBg();
+    } catch(e) { alert(isSvg ? '瀏覽器無法解析這個 SVG(XML 可能有誤)。' : '無法讀取這個 PNG。'); return; }
+    refresh();
+  }
+  function detectFakeBg() {
+    const A = state.A;
+    $('debgNote').style.display = 'none';
+    if (A.isSvg) { $('debg').checked = false; return; }
+    const cv = document.createElement('canvas');
+    cv.width = A.w; cv.height = A.h;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(A.img, 0, 0);
+    const pts = [[2,2],[A.w-3,2],[2,A.h-3],[A.w-3,A.h-3],[Math.floor(A.w/2),2],[2,Math.floor(A.h/2)]];
+    let n = 0;
+    for (const [x,y] of pts) {
+      const p = ctx.getImageData(x, y, 1, 1).data;
+      if (p[3] > 240 && (p[0]+p[1]+p[2])/3 > 215) n++;
+    }
+    const fake = n >= 4;
+    $('debg').checked = fake;
+    if (fake) $('debgNote').style.display = 'block';
+  }
+
+  // ===== 圖案處理 =====
+  function getStamp() {
+    const A = state.A;
+    const debg = $('debg').checked && !A.isSvg;
+    const tint = state.tint;
+    const targetW = A.isSvg ? Math.max(1, Math.ceil(stampW())) : A.w;
+    const key = [targetW, debg, tint ? tint.join(',') : 'orig'].join('|');
+    if (state.stampCache.key === key) return state.stampCache.canvas;
+    const w = targetW, h = Math.max(1, Math.round(targetW * A.h / A.w));
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(A.img, 0, 0, w, h);
+    if (debg || tint) {
+      const d = ctx.getImageData(0, 0, w, h);
+      const p = d.data;
+      for (let i = 0; i < p.length; i += 4) {
+        let a = p[i+3] / 255;
+        if (debg) {
+          const lum = (p[i]+p[i+1]+p[i+2]) / 3;
+          a *= Math.min(1, Math.max(0, (BG_L - lum) / (BG_L - INK_L)));
+        }
+        if (tint) { p[i]=tint[0]; p[i+1]=tint[1]; p[i+2]=tint[2]; }
+        p[i+3] = Math.round(a * 255);
+      }
+      ctx.putImageData(d, 0, 0);
+    }
+    state.stampCache = { key, canvas: cv };
+    return cv;
+  }
+  function stampW() { return state.B.w * parseInt($('size').value, 10) / 100; }
+  function updateStampNote() {
+    if (!state.A || !state.B) return;
+    const n = $('stampNote');
+    const w = stampW();
+    if (state.A.isSvg) { n.className=''; n.textContent = '向量圖案,任何大小都銳利。'; return; }
+    const scale = w / state.A.w;
+    if (scale <= 1.001) {
+      n.className='';
+      n.textContent = '繪製寬度 ' + Math.round(w) + 'px ≤ 圖案原始 ' + state.A.w + 'px';
+    } else {
+      n.className='bad';
+      n.textContent = '⚠ 繪製寬度 ' + Math.round(w) + 'px 超過圖案原始 ' + state.A.w +
+        'px(放大 ' + Math.round(scale*100) + '%)，會糊。請縮小圖案、或準備至少 ' + Math.ceil(w) + 'px 寬的圖案檔。';
+    }
+  }
+
+  // ===== 排版引擎(共用) =====
+  function layoutPts(sw, sh, cfg) {
+    const { w: bw, h: bh } = state.B;
+    const pts = [];
+    if (cfg.mode === 'single') {
+      const ox = cfg.offX / 100 * bw, oy = cfg.offY / 100 * bh;
+      const xs = [sw/2, bw/2, bw - sw/2];
+      const ys = [sh/2, bh/2, bh - sh/2];
+      const r = Math.floor(cfg.pos / 3), c = cfg.pos % 3;
+      pts.push([xs[c] + ox, ys[r] + oy]);
+    } else {
+      const cols = Math.max(1, cfg.cols|0), rows = Math.max(1, cfg.rows|0);
+      const dx = bw / cols, dy = bh / rows;
+      for (let r = 0; r < rows; r++) {
+        const off = (cfg.stagger && r % 2 === 1) ? dx/2 : 0;
+        for (let c = -1; c <= cols; c++) {
+          const x = dx*c + dx/2 + off;
+          if (x + sw/2 <= 0 || x - sw/2 >= bw) continue;
+          pts.push([x, dy*r + dy/2]);
+        }
+      }
+    }
+    return pts;
+  }
+
+  // ===== 疊圖 =====
+  function composite(cv) {
+    const { img: B, w: bw, h: bh } = state.B;
+    cv.width = bw; cv.height = bh;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(B, 0, 0);
+
+    if (state.A) {
+      ctx.globalAlpha = parseInt($('opacity').value, 10) / 100;
+      const rot = parseInt($('rotate').value, 10) * Math.PI / 180;
+      const sw = stampW(), sh = sw * state.A.h / state.A.w;
+      const stamp = getStamp();
+      const cfg = {
+        mode: state.mode, pos: state.pos,
+        offX: parseInt($('offX').value,10), offY: parseInt($('offY').value,10),
+        cols: parseInt($('cols').value,10), rows: parseInt($('rows').value,10),
+        stagger: $('stagger').checked,
+      };
+      for (const [x,y] of layoutPts(sw, sh, cfg)) {
+        ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+        ctx.drawImage(stamp, -sw/2, -sh/2, sw, sh);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    for (const t of state.texts) {
+      if (!t.text.trim()) continue;
+      const px = bw * t.size / 100;
+      ctx.font = px + 'px "' + t.font + '", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = t.color;
+      ctx.globalAlpha = t.opacity / 100;
+      const sw = ctx.measureText(t.text).width, sh = px * 1.25;
+      const rot = t.rotate * Math.PI / 180;
+      for (const [x,y] of layoutPts(sw, sh, t)) {
+        ctx.save(); ctx.translate(x,y); ctx.rotate(rot);
+        ctx.fillText(t.text, 0, 0);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function hasSource() {
+    return !!state.A || state.texts.some(t => t.text.trim());
+  }
+  function refresh() {
+    if (state.B) {
+      updateStampNote();
+      composite($('previewCv'));
+      const isJpg = state.B.type === 'image/jpeg';
+      $('outMeta').textContent = '輸出:' + fmtDim(state.B.w, state.B.h) + (isJpg ? ' · JPEG 品質 95' : ' · PNG');
+    }
+    $('export').disabled = !(state.B && hasSource());
+  }
+
+  // ===== 文字層 =====
+  let tSeq = 0;
+  function addTextLayer() {
+    if (state.texts.length >= MAX_TEXTS) return;
+    const t = {
+      id: ++tSeq, text: '', font: state.fonts[0], size: 6, color: '#ffffff',
+      opacity: 80, rotate: 0,
+      mode: 'single', pos: 8, offX: 0, offY: 0, cols: 4, rows: 4, stagger: true,
+    };
+    state.texts.push(t);
+    $('tlayers').appendChild(buildTextCard(t));
+    $('addText').disabled = state.texts.length >= MAX_TEXTS;
+    refresh();
+  }
+  function buildTextCard(t) {
+    const el = document.createElement('div');
+    el.className = 'tlayer';
+
+    const head = document.createElement('div'); head.className = 'thead';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.placeholder = '輸入浮水印文字…'; inp.maxLength = 60;
+    inp.addEventListener('input', () => { t.text = inp.value; refresh(); });
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'del'; del.textContent = '✕'; del.title = '刪除這個浮水印';
+    del.addEventListener('click', () => {
+      state.texts = state.texts.filter(x => x !== t);
+      el.remove();
+      $('addText').disabled = false;
+      refresh();
+    });
+    head.append(inp, del); el.appendChild(head);
+
+    const sel = document.createElement('select');
+    fillFontSelect(sel, t.font);
+    sel.addEventListener('change', () => { t.font = sel.value; sel.style.fontFamily = '"'+sel.value+'"'; refresh(); });
+    sel.style.fontFamily = '"'+t.font+'"';
+    el.appendChild(sel);
+
+    el.appendChild(sliderRow('大小', 2, 30, t.size, '%', v => { t.size = v; }));
+
+    const pal = document.createElement('div'); pal.className = 'palette'; pal.style.marginBottom = '8px';
+    const marks = [];
+    function mark(b) { marks.forEach(x => x.classList.remove('on')); b.classList.add('on'); }
+    for (const [hex, name] of PRESETS) {
+      const b = document.createElement('button');
+      b.type='button'; b.className='sw'; b.style.background = hex; b.title = name;
+      if (hex === t.color) b.classList.add('on');
+      b.addEventListener('click', () => { t.color = hex; mark(b); refresh(); });
+      pal.appendChild(b); marks.push(b);
+    }
+    const cc = document.createElement('input');
+    cc.type='color'; cc.value = '#8a93a6'; cc.title = '自訂顏色';
+    cc.addEventListener('input', () => { t.color = cc.value; mark(cc); refresh(); });
+    pal.appendChild(cc); marks.push(cc);
+    el.appendChild(pal);
+
+    const seg = document.createElement('div'); seg.className = 'seg'; seg.style.marginBottom = '8px';
+    const bs = document.createElement('button'); bs.type='button'; bs.textContent='單一'; bs.className='on';
+    const bg = document.createElement('button'); bg.type='button'; bg.textContent='網格';
+    const singleBox = document.createElement('div');
+    const gridBox = document.createElement('div'); gridBox.style.display = 'none';
+    bs.addEventListener('click', () => { t.mode='single'; bs.classList.add('on'); bg.classList.remove('on'); singleBox.style.display='block'; gridBox.style.display='none'; refresh(); });
+    bg.addEventListener('click', () => { t.mode='grid'; bg.classList.add('on'); bs.classList.remove('on'); gridBox.style.display='block'; singleBox.style.display='none'; refresh(); });
+    seg.append(bs, bg); el.appendChild(seg);
+
+    const mini = document.createElement('div'); mini.className = 'miniPos'; mini.style.marginBottom = '6px';
+    const posBtns = [];
+    for (let i = 0; i < 9; i++) {
+      const b = document.createElement('button');
+      b.type='button'; b.setAttribute('aria-label','位置'+(i+1));
+      if (i === t.pos) b.classList.add('on');
+      b.addEventListener('click', () => {
+        posBtns.forEach(x => x.classList.remove('on')); b.classList.add('on');
+        t.pos = i; t.offX = 0; t.offY = 0;
+        oxRow.reset(0); oyRow.reset(0);
+        refresh();
+      });
+      mini.appendChild(b); posBtns.push(b);
+    }
+    singleBox.appendChild(mini);
+    const oxRow = sliderRow('位移X', -30, 30, t.offX, '%', v => { t.offX = v; });
+    const oyRow = sliderRow('位移Y', -30, 30, t.offY, '%', v => { t.offY = v; });
+    singleBox.append(oxRow, oyRow);
+    el.appendChild(singleBox);
+
+    const nr = document.createElement('div'); nr.className = 'num-row'; nr.style.marginBottom = '4px';
+    nr.append('橫 ');
+    const ci = document.createElement('input'); ci.type='number'; ci.min=1; ci.max=12; ci.value=t.cols;
+    ci.addEventListener('input', () => { t.cols = parseInt(ci.value,10)||1; refresh(); });
+    nr.appendChild(ci); nr.append(' × 縱 ');
+    const ri = document.createElement('input'); ri.type='number'; ri.min=1; ri.max=12; ri.value=t.rows;
+    ri.addEventListener('input', () => { t.rows = parseInt(ri.value,10)||1; refresh(); });
+    nr.appendChild(ri);
+    gridBox.appendChild(nr);
+    const stLab = document.createElement('label'); stLab.className = 'chk';
+    const st = document.createElement('input'); st.type='checkbox'; st.checked = t.stagger;
+    st.addEventListener('change', () => { t.stagger = st.checked; refresh(); });
+    stLab.append(st, ' 交錯排列(邊緣補滿)');
+    gridBox.appendChild(stLab);
+    el.appendChild(gridBox);
+
+    el.appendChild(sliderRow('濃度', 10, 100, t.opacity, '%', v => { t.opacity = v; }));
+    el.appendChild(sliderRow('旋轉', -45, 45, t.rotate, '°', v => { t.rotate = v; }));
+
+    return el;
+
+    function sliderRow(label, min, max, val, unit, onChange) {
+      const row = document.createElement('div'); row.className = 'slider-row';
+      const tag = document.createElement('span'); tag.className='tag'; tag.textContent = label;
+      const rg = document.createElement('input'); rg.type='range'; rg.min=min; rg.max=max; rg.value=val;
+      const vv = document.createElement('span'); vv.className='val'; vv.textContent = val + unit;
+      rg.addEventListener('input', () => { vv.textContent = rg.value + unit; onChange(parseInt(rg.value,10)); refresh(); });
+      row.append(tag, rg, vv);
+      row.reset = v => { rg.value = v; vv.textContent = v + unit; };
+      return row;
+    }
+  }
+  $('addText').addEventListener('click', addTextLayer);
+
+  // ===== 圖案控制項 =====
+  document.querySelectorAll('#modeSeg button').forEach(b =>
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#modeSeg button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      state.mode = b.dataset.m;
+      $('singleCtrl').style.display = state.mode === 'single' ? 'block' : 'none';
+      $('gridCtrl').style.display = state.mode === 'grid' ? 'block' : 'none';
+      refresh();
+    }));
+  for (let i = 0; i < 9; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-label', '位置 ' + (i+1));
+    if (i === 8) b.classList.add('on');
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#posGrid button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      state.pos = i;
+      $('offX').value = 0; $('offY').value = 0;
+      $('offXVal').textContent = '0%'; $('offYVal').textContent = '0%';
+      refresh();
+    });
+    $('posGrid').appendChild(b);
+  }
+  [['size','sizeVal','%'],['offX','offXVal','%'],['offY','offYVal','%'],
+   ['opacity','opVal','%'],['rotate','rotVal','°']]
+    .forEach(([id, val, unit]) => $(id).addEventListener('input', () => {
+      $(val).textContent = $(id).value + unit;
+      refresh();
+    }));
+  ['cols','rows'].forEach(id => $(id).addEventListener('input', refresh));
+  $('stagger').addEventListener('change', refresh);
+  $('debg').addEventListener('change', () => { state.stampCache.key = ''; refresh(); });
+
+  (function buildPalette() {
+    const pal = $('palette');
+    const marks = [];
+    function mark(b) { marks.forEach(x => x.classList.remove('on')); b.classList.add('on'); }
+    const orig = document.createElement('button');
+    orig.type='button'; orig.className='orig on'; orig.textContent='原色';
+    orig.addEventListener('click', () => { state.tint = null; mark(orig); refresh(); });
+    pal.appendChild(orig); marks.push(orig);
+    for (const [hex, name] of PRESETS) {
+      const b = document.createElement('button');
+      b.type='button'; b.className='sw'; b.style.background = hex; b.title = name;
+      b.addEventListener('click', () => { state.tint = hexToRgb(hex); mark(b); refresh(); });
+      pal.appendChild(b); marks.push(b);
+    }
+    const cc = document.createElement('input');
+    cc.type='color'; cc.value='#8a93a6'; cc.title='自訂顏色';
+    cc.addEventListener('input', () => { state.tint = hexToRgb(cc.value); mark(cc); refresh(); });
+    pal.appendChild(cc); marks.push(cc);
+  })();
+
+  // ===== 輸出 =====
+  $('export').addEventListener('click', () => {
+    const btn = $('export');
+    btn.disabled = true; btn.textContent = '輸出中…';
+    const cv = document.createElement('canvas');
+    composite(cv);
+    const isJpg = state.B.type === 'image/jpeg';
+    cv.toBlob(blob => {
+      btn.disabled = false; btn.textContent = '輸出圖片';
+      if (!blob) { alert('輸出失敗,可能是圖片過大。'); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = state.B.name.replace(/\.[^.]+$/, '') + '_wm.' + (isJpg ? 'jpg' : 'png');
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }, isJpg ? 'image/jpeg' : 'image/png', 0.95);
+  });
+
+  // ===== 拖放 =====
+  function bindSlot(slotId, inputId, loader) {
+    const slot = $(slotId), input = $(inputId);
+    slot.addEventListener('click', e => {
+      if (e.target.classList.contains('swap')) return;
+      if (!slot.classList.contains('filled')) input.click();
+    });
+    slot.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && !slot.classList.contains('filled')) input.click();
+    });
+    input.addEventListener('change', () => loader(input.files[0]));
+    ['dragover','dragenter'].forEach(ev => slot.addEventListener(ev, e => { e.preventDefault(); slot.classList.add('over'); }));
+    ['dragleave','drop'].forEach(ev => slot.addEventListener(ev, e => { e.preventDefault(); slot.classList.remove('over'); }));
+    slot.addEventListener('drop', e => loader(e.dataTransfer.files[0]));
+  }
+  bindSlot('slotB','fileB',loadB);
+  bindSlot('slotA','fileA',loadA);
+  document.querySelectorAll('.swap').forEach(b => b.addEventListener('click', () => $(b.dataset.for).click()));
+</script>
+</body>
+</html>
