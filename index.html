@@ -435,7 +435,7 @@
         $('fontApiBtn').textContent = '已載入 ' + fams.length + ' 個裝置字型';
       }
     } catch(e) {
-      alert('未取得字型授權,維持使用內建偵測清單。\n(若沒有出現授權視窗,請確認網頁是透過 https 開啟,本機直接開檔案不支援此功能。)');
+      alert('未取得字型授權，維持使用內建偵測清單。\n(若沒有出現授權視窗，請確認網頁是透過 https 開啟，本機直接開檔案不支援此功能。)');
     }
   });
   // ===== 搜尋式字型選單(單一欄位 combobox:可打字過濾,右側箭頭展開) =====
@@ -517,12 +517,12 @@
       inp.value = labelOf(t.font);
       inp.style.fontFamily = '"' + t.font + '"';
     }
-    // 選定字型 = 完成操作:收合清單並主動失焦。
-    // 想改別的字型再點一次欄位即可;維持原字型才需點空白/Esc。
+    // 選定字型 = 完成操作：收合清單並主動失焦。
+    // 想改別的字型再點一次欄位即可；維持原字型才需點空白/Esc。
     let picking = false;
     function pick(f) {
       t.font = f;
-      picking = true;              // 標記:接下來的 blur 是「已完成」而非「取消」
+      picking = true;              // 標記：接下來的 blur 是「已完成」而非「取消」
       open = false; list.style.display = 'none'; active = -1;
       inp.value = labelOf(t.font);
       inp.style.fontFamily = '"' + t.font + '"';
@@ -954,7 +954,7 @@
     const isJpg = state.B.type === 'image/jpeg';
     cv.toBlob(blob => {
       btn.disabled = false; btn.textContent = '輸出圖片';
-      if (!blob) { alert('輸出失敗,可能是圖片過大。'); return; }
+      if (!blob) { alert('輸出失敗，可能是圖片過大。'); return; }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = state.B.name.replace(/\.[^.]+$/, '') + '_wm.' + (isJpg ? 'jpg' : 'png');
