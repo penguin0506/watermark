@@ -5,19 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>浮水印排版工具</title>
 <style>
+  @font-face {
+    font-family: 'Iansui';
+    src: url('Iansui-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+  }
   :root {
     --ink: #3d4450; --mist: #7f8893; --frost: #b2bac3;
     --paper: #f7f8f9; --card: #ffffff; --line: #e3e6ea; --accent: #5b6b7f;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+    font-family: 'Iansui', -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
     background: var(--paper); color: var(--ink);
     min-height: 100vh; display: flex; flex-direction: column; align-items: center;
     padding: 32px 16px 60px;
   }
   header { text-align: center; margin-bottom: 22px; }
-  h1 { font-family: "Kaiti TC","BiauKai","Kaiti SC",serif; font-size: 26px; font-weight: 400; letter-spacing: 5px; }
+  h1 { font-family: 'Iansui', "Kaiti TC","BiauKai",serif; font-size: 28px; font-weight: 400; letter-spacing: 4px; }
   .sub { margin-top: 8px; font-size: 13px; color: var(--mist); letter-spacing: 1px; }
 
   /* ===== 左右兩大區 ===== */
@@ -84,8 +90,9 @@
     width: 52px; padding: 5px 6px; font-size: 13px; font-family: inherit;
     border: 1px solid var(--line); border-radius: 6px; text-align: center;
   }
-  .chk { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer; }
-  .chk input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer; line-height: 1.3; }
+  .chk input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; flex: 0 0 auto; }
+  .chk > * { vertical-align: middle; }
 
   #posGrid {
     display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
@@ -168,9 +175,12 @@
   .fpick .flist {
     display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
     background: var(--card); border: 1px solid var(--line); border-radius: 8px;
-    max-height: 230px; overflow-y: auto; box-shadow: 0 6px 18px rgba(61,68,80,.14);
+    max-height: 260px; overflow-y: auto; box-shadow: 0 6px 18px rgba(61,68,80,.14);
+    -webkit-overflow-scrolling: touch;   /* iOS 慣性捲動 */
+    overscroll-behavior: contain;         /* 捲到底不帶動整頁 */
+    touch-action: pan-y;                  /* 明確允許垂直捲動手勢 */
   }
-  .fpick .fitem { padding: 7px 10px; font-size: 15px; cursor: pointer; border-bottom: 1px solid #f0f2f4; }
+  .fpick .fitem { padding: 10px 12px; font-size: 15px; cursor: pointer; border-bottom: 1px solid #f0f2f4; }
   .fpick .fitem:last-child { border-bottom: none; }
   .fpick .fitem.none { color: var(--mist); font-size: 12px; cursor: default; }
   #addText {
@@ -263,7 +273,7 @@
                   <input type="range" id="offY" min="-30" max="30" value="0">
                   <span class="val" id="offYVal">0%</span>
                 </div>
-                <p style="font-size:12px;color:var(--mist);margin-top:2px;line-height:1.6">0 = 貼齊選定位置。<br>X 正右負左、Y 正下負上，換位置時自動重置。</p>
+                <p style="font-size:12px;color:var(--mist);margin-top:2px;line-height:1.6">0 = 貼齊選定位置。<br>X 正右負左、Y 正下負上，換位置時自動歸零。</p>
               </div>
             </div>
             <div class="ctrl" id="gridCtrl" style="display:none">
@@ -272,13 +282,13 @@
                 橫 <input type="number" id="cols" min="1" max="12" value="4">
                 × 縱 <input type="number" id="rows" min="1" max="12" value="4">
               </div>
-              <label class="chk"><input type="checkbox" id="stagger" checked> 交錯排列</label>
+              <label class="chk"><input type="checkbox" id="stagger" checked> <span>交錯排列(邊緣補滿)</span></label>
             </div>
             <div class="ctrl">
               <label>顏色</label>
               <div class="palette" id="palette"></div>
-              <label class="chk"><input type="checkbox" id="debg"> 白底轉透明</label>
-              <p id="debgNote">偵測到使用的圖案背景不是alpha透明,已自動開啟修正。</p>
+              <label class="chk"><input type="checkbox" id="debg"> <span>白底轉透明</span></label>
+              <p id="debgNote">偵測到使用的圖案背景不是alpha透明，已自動開啟修正。</p>
             </div>
             <div class="ctrl">
               <label>濃度</label>
@@ -302,7 +312,7 @@
           <div id="tlayers"></div>
           <button id="addText" type="button">+ 新增文字浮水印(最多 5 個)</button>
           <button id="fontApiBtn" type="button">獲取裝置全部字型(點擊以授權)</button>
-          <p style="font-size:12px;color:var(--mist);line-height:1.7;margin-top:6px">剛安裝的新字型要<b>完全關閉瀏覽器再重開</b>，重新整理頁面沒有用。</p>
+          <p style="font-size:12px;color:var(--mist);line-height:1.7;margin-top:6px">※剛安裝的新字型要<b>完全關閉瀏覽器再重開</b>，重新整理頁面沒有用。</p>
         </div>
       </div>
     </div>
@@ -413,7 +423,7 @@
   $('fontApiBtn').style.display = 'inline';
   $('fontApiBtn').addEventListener('click', async () => {
     if (!('queryLocalFonts' in window)) {
-      alert('這個瀏覽器不支援讀取裝置字型清單。\n目前只有桌面版 Chrome / Edge 提供此功能，Safari、Firefox 與所有手機瀏覽器都不支援。');
+      alert('此瀏覽器不支援讀取裝置字型清單。\n只有桌面版 Chrome / Edge 提供此功能，Safari、Firefox 與所有手機瀏覽器都不支援。');
       return;
     }
     try {
@@ -425,7 +435,7 @@
         $('fontApiBtn').textContent = '已載入 ' + fams.length + ' 個裝置字型';
       }
     } catch(e) {
-      alert('未取得字型授權，維持使用內建偵測清單。\n(若沒有出現授權視窗,請確認網頁是透過 https 開啟，本機直接開檔案不支援此功能。)');
+      alert('未取得字型授權,維持使用內建偵測清單。\n(若沒有出現授權視窗,請確認網頁是透過 https 開啟,本機直接開檔案不支援此功能。)');
     }
   });
   // ===== 搜尋式字型選單(單一欄位 combobox:可打字過濾,右側箭頭展開) =====
@@ -434,7 +444,7 @@
     const inp = document.createElement('input');
     inp.type = 'text'; inp.className = 'finput';
     inp.placeholder = '字型';
-    // inp.title = '點擊展開清單，可直接打字搜尋；清單沒有的字型輸入名稱後按 Enter 加入';
+    // inp.title = '點擊展開清單,可直接打字搜尋;清單沒有的字型輸入名稱後按 Enter 加入';
     inp.value = labelOf(t.font);
     inp.style.fontFamily = '"' + t.font + '"';
     const arrow = document.createElement('button');
@@ -458,9 +468,23 @@
         if (f === t.font) it.classList.add('cur');
         if (i === active) it.classList.add('active');
         it.dataset.i = i;
-        // mousedown/touchstart 而非 click:搶在輸入框失焦前處理,由 pick 主動收尾
+        // 桌機:mousedown + preventDefault,搶在輸入框失焦前選中,由 pick 收尾
         it.addEventListener('mousedown', e => { e.preventDefault(); pick(f); });
-        it.addEventListener('touchstart', e => { e.preventDefault(); pick(f); }, { passive: false });
+        // 觸控:用移動距離區分「點選」與「捲動」——touchstart 不做任何事、
+        // 也不 preventDefault,讓清單能正常滑動;放手時若幾乎沒移動才算點選
+        let tsx = 0, tsy = 0, moved = false;
+        it.addEventListener('touchstart', e => {
+          const p = e.touches[0]; tsx = p.clientX; tsy = p.clientY; moved = false;
+        }, { passive: true });
+        it.addEventListener('touchmove', e => {
+          const p = e.touches[0];
+          if (Math.abs(p.clientX - tsx) > 8 || Math.abs(p.clientY - tsy) > 8) moved = true;
+        }, { passive: true });
+        it.addEventListener('touchend', e => {
+          if (moved) return;               // 有滑動 = 捲動,不選取
+          e.preventDefault();              // 沒滑動 = 點選,阻止後續 click/焦點跳動
+          pick(f);
+        });
         it.addEventListener('mousemove', () => setActive(i, false));
         list.appendChild(it);
       });
@@ -544,7 +568,7 @@
         if (!state.fonts.includes(q)) state.fonts.unshift(q);
         pick(q);
       } else {
-        alert('這台裝置上偵測不到「' + q + '」。\n請確認名稱與系統字型設定中的完全一致(可直接複製過來);剛安裝的字型需完全關閉瀏覽器重開。');
+        alert('這台裝置上搜尋不到「' + q + '」。\n請確認名稱與系統字型設定中的完全一致；剛安裝的字型需完全關閉瀏覽器重開。');
       }
     });
     arrow.addEventListener('mousedown', e => {
@@ -651,7 +675,7 @@
     if (!state.A || !state.B) return;
     const n = $('stampNote');
     const w = stampW();
-    if (state.A.isSvg) { n.className=''; n.textContent = '向量圖案,任何大小都銳利。'; return; }
+    if (state.A.isSvg) { n.className=''; n.textContent = '向量圖案，任何大小都銳利。'; return; }
     const scale = w / state.A.w;
     if (scale <= 1.001) {
       n.className='';
@@ -840,7 +864,8 @@
     const stLab = document.createElement('label'); stLab.className = 'chk';
     const st = document.createElement('input'); st.type='checkbox'; st.checked = t.stagger;
     st.addEventListener('change', () => { t.stagger = st.checked; refresh(); });
-    stLab.append(st, ' 交錯排列(邊緣補滿)');
+    const stTxt = document.createElement('span'); stTxt.textContent = '交錯排列(邊緣補滿)';
+    stLab.append(st, stTxt);
     gridBox.appendChild(stLab);
     arrangeBox.appendChild(gridBox);
     el.appendChild(arrangeBox);
